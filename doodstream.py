@@ -3,7 +3,6 @@ import re
 import random
 import time
 from typing import Optional, Tuple
-from urllib.parse import urlparse
 import aiohttp
 from bs4 import BeautifulSoup
 
@@ -13,28 +12,31 @@ class DoodStreamAPI:
         self.logger = logging.getLogger(__name__)
     
     async def get_download_url(self, url: str) -> Optional[Tuple[str, str]]:
-        # Otomatis mengubah /d/ menjadi /e/ karena data hanya ada di halaman embed
+        # Normalisasi URL: Pastikan menggunakan /e/ (embed)
         embed_url = url.replace('/d/', '/e/').replace('/f/', '/e/')
 
         try:
             # Mengikuti redirect jika domain berubah (misal ke myvidplay.com)
             async with self.session.get(embed_url, allow_redirects=True) as response:
                 response.raise_for_status()
-                # Mengambil domain terbaru setelah redirect
+                
+                # PERBAIKAN DI SINI:
+                # response.url adalah objek yarl.URL, gunakan .host bukan .netloc
                 final_url_obj = response.url
-                domain = final_url_obj.netloc
+                domain = final_url_obj.host 
                 html_content = await response.text()
             
-            # Header Referer harus sesuai dengan URL embed terakhir
+            # Update Referer agar sinkron dengan domain terbaru
             self.session.headers.update({"Referer": str(final_url_obj)})
 
             # Mencari token pass_md5
             pass_md5_match = re.search(r'/pass_md5/([^"\']+)', html_content)
             if not pass_md5_match:
+                self.logger.error("Token pass_md5 tidak ditemukan di HTML.")
                 return None
             
             pass_md5_path = pass_md5_match.group(1)
-            # Request ke domain terbaru yang didapat dari redirect
+            # Request ke domain terbaru hasil redirect
             pass_md5_url = f"https://{domain}/pass_md5/{pass_md5_path}"
 
             async with self.session.get(pass_md5_url) as md5_response:
@@ -48,10 +50,10 @@ class DoodStreamAPI:
             final_download_link = f"{media_url_base}{random_chars}?token={token}&expiry={int(time.time())}"
 
             soup = BeautifulSoup(html_content, "html.parser")
-            title = soup.find("title").text.strip() if soup.find("title") else "Video"
+            title = soup.find("title").text.strip() if soup.find("title") else "Video_Doodstream"
             title = re.sub(r'[\\/*?:"<>|]', "", title)
 
             return final_download_link, title
         except Exception as e:
-            self.logger.error(f"Error: {e}")
+            self.logger.error(f"Terjadi kesalahan: {e}")
             return None
