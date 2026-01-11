@@ -1,29 +1,31 @@
 import streamlit as st
-import asyncio
-import aiohttp
 from doodstream import DoodStreamAPI
 
-st.set_page_config(page_title="Doodozer Downloader", page_icon="🎥")
+# Konfigurasi UI
+st.set_page_config(page_title="Doodozer Cloudflare Bypass", page_icon="🛡️")
 
-st.title("🎥 Doodozer Downloader")
-st.write("Masukkan link DoodStream (format /d/ atau /e/) di bawah ini.")
+st.title("🛡️ Doodozer Downloader")
+st.markdown("Aplikasi ini menggunakan `cloudscraper` untuk mencoba melewati proteksi Cloudflare.")
 
-async def process_url(url):
-    async with aiohttp.ClientSession() as session:
-        api = DoodStreamAPI(session)
-        return await api.get_download_url(url)
+# Inisialisasi API (disimpan dalam session agar tidak dibuat ulang terus-menerus)
+if 'api' not in st.session_state:
+    st.session_state.api = DoodStreamAPI()
 
-url_input = st.text_input("URL Video:", placeholder="https://dood.li/d/xxxx atau https://myvidplay.com/e/xxxx")
+url_input = st.text_input("Masukkan URL DoodStream:", placeholder="https://dood.li/d/xxxx")
 
-if st.button("Generate Link", type="primary"):
+if st.button("Generate Download Link", type="primary"):
     if url_input:
-        with st.spinner("Sedang memproses pengalihan domain..."):
-            result = asyncio.run(process_url(url_input))
+        with st.spinner("Sedang menembus Cloudflare... Mohon tunggu."):
+            # Panggilan sinkron langsung
+            result = st.session_state.api.get_download_url(url_input)
+            
             if result:
                 dl_url, title = result
-                st.success(f"Ditemukan: {title}")
-                st.link_button("DOWNLOAD SEKARANG", dl_url)
+                st.success(f"Berhasil! Video: **{title}**")
+                st.link_button("KLIK UNTUK DOWNLOAD", dl_url)
+                st.info("Tips: Jika video terputar otomatis, klik kanan tombol di atas dan pilih 'Save link as'.")
             else:
-                st.error("Gagal mengekstrak link. Domain mungkin memblokir akses atau link mati.")
+                st.error("Gagal mendapatkan link. Cloudflare mungkin masih memblokir IP server ini.")
+                st.info("Cobalah jalankan script ini di komputer lokal jika server cloud gagal.")
     else:
-        st.warning("Masukkan URL terlebih dahulu.")
+        st.warning("Silakan masukkan URL.")
