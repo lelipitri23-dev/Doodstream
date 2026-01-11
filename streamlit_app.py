@@ -1,45 +1,45 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
-import os
+import streamlit as st
 import asyncio
 import aiohttp
-from doodstream import DoodStreamAPI # Mengambil kelas yang sudah kamu buat
+import re
+from doodstream import DoodStreamAPI
 
-app = Flask(__name__)
-app.secret_key = "secret_doodoo"
+# Konfigurasi Halaman
+st.set_page_config(page_title="Doodozer Downloader", page_icon="🚀")
 
-# Fungsi pembantu untuk menjalankan coroutine asinkron di dalam Flask (sync)
-def run_async(coro):
-    return asyncio.run(coro)
+st.title("🚀 Doodozer Downloader")
+st.markdown("Masukkan URL DoodStream untuk mendapatkan link unduhan langsung.")
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        url = request.form.get('url')
-        if not url:
-            flash("Silakan masukkan URL DoodStream!")
-            return redirect(url_for('index'))
-        
-        # Proses mendapatkan link
-        try:
-            async def get_info():
-                async with aiohttp.ClientSession() as session:
-                    api = DoodStreamAPI(session)
-                    return await api.get_download_url(url)
-            
-            result = run_async(get_info())
-            
-            if result:
-                download_url, title = result
-                return render_template('index.html', title=title, download_url=download_url)
-            else:
-                flash("Gagal mendapatkan link. Pastikan URL benar.")
-        except Exception as e:
-            flash(f"Terjadi kesalahan: {str(e)}")
-            
-    return render_template('index.html')
+# Fungsi asinkron untuk mengambil data
+async def fetch_dood_data(url):
+    async with aiohttp.ClientSession() as session:
+        api = DoodStreamAPI(session)
+        return await api.get_download_url(url)
 
-if __name__ == '__main__':
-    # Gunakan PORT dari sistem (untuk Deploy) atau default 5000 (untuk Lokal)
-    port = int(os.environ.get("PORT", 5000))
-    # Jangan gunakan debug=True saat di produksi (Render/Vercel)
-    app.run(host='0.0.0.0', port=port)
+# Input URL
+url_input = st.text_input("URL DoodStream:", placeholder="https://dood.la/e/xxxx")
+
+if st.button("Dapatkan Link"):
+    if url_input:
+        if "dood" in url_input:
+            with st.spinner("Sedang memproses..."):
+                try:
+                    # Menjalankan fungsi async di Streamlit
+                    result = asyncio.run(fetch_dood_data(url_input))
+                    
+                    if result:
+                        download_url, title = result
+                        st.success("Berhasil mengekstrak link!")
+                        st.write(f"**Judul:** {title}")
+                        
+                        # Tombol Download
+                        st.link_button("DOWNLOAD VIDEO", download_url, type="primary")
+                        st.info("Catatan: Jika video hanya terputar, klik kanan tombol dan pilih 'Save link as'.")
+                    else:
+                        st.error("Gagal mendapatkan link. Pastikan URL benar atau coba lagi nanti.")
+                except Exception as e:
+                    st.error(f"Terjadi kesalahan: {e}")
+        else:
+            st.warning("Mohon masukkan URL DoodStream yang valid.")
+    else:
+        st.warning("Silakan masukkan URL terlebih dahulu.")
